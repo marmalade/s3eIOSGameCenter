@@ -1,0 +1,51 @@
+#mkf file for building extension s3eIOSGameCenter.
+#NOTE: This file was origianlly written by the extension builder, but will not
+#be overwritten (unless --force is specified) and is intended to be modified.
+
+display_name "Extensions/s3eIOSGameCenter"
+
+includepath source/h
+
+includepath h
+
+defines
+{
+    #Define the verbose channel to be off by default (but controllable by icf)
+    IW_TRACE_CHANNEL_IOSGAMECENTER_VERBOSE=2
+
+    #This macro indicates that this extension is being built
+    S3E_EXT_IOSGAMECENTER
+}
+
+#This command re-generates the relevant source files from the s4e when
+#the mkb is run
+extension
+{
+    ("$AIRPLAY_ROOT/extensions/builder")
+    "make_extension s3eIOSGameCenter.s4e"
+}
+
+#include the extension builder subproject
+subproject s3e/edk
+
+file s3eIOSGameCenter.s4e
+
+#This extension is intended to only be built for iOS
+files
+{
+    ["source"]
+    (source/generic)
+    s3eIOSGameCenter_register.cpp
+
+    (source/iphone)    
+    s3eIOSGameCenter.mm
+
+    ["h"]
+    (source/h)
+    s3eIOSGameCenter_internal.h
+    s3eIOSGameCenter_autodefs.h
+
+    ["docs"]
+    (interface)
+    s3eIOSGameCenter.defines.txt
+}

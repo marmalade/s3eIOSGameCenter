@@ -1,0 +1,1800 @@
+#
+# Copyright (C) 2001-2011 Ideaworks3D Ltd.
+# All Rights Reserved.
+#
+# This document is protected by copyright, and contains information
+# proprietary to Ideaworks3D.
+# This file consists of source code released by Ideaworks3D under
+# the terms of the accompanying End User License Agreement (EULA).
+# Please do not use this program/source code before you have read the
+# EULA and have agreed to be bound by its terms.
+#
+errors
+use_legacy_extavailable
+include:
+
+#include <s3eTypes.h>
+
+/**
+ * @addtogroup s3egroup
+ * @{
+ */
+
+/**
+ * @defgroup iosgamecenterapigroup S3E iOS Game Center API Reference
+ *
+ * S3E Game Center implements the connectivity functionality provided by the
+ * Game Center features in the iOS SDK's Game Kit Framework.
+ *
+ * This API wraps iOS functionality fairly closely so it is recommended to
+ * refer to the iOS SDK documentation where appropriate.
+ *
+ * It allows users apps to join "matches", through which they
+ * can send game and voice data. It also provides game-centric features such
+ * as registering/reading scores and achievements. The network/server
+ * implementation is provided by Apple - just requiring minimal set-up through
+ * iTunes Connect - but it is possible to host your own matches with your own
+ * servers and data framework and simply use Game Center for matchmaking.
+ *
+ * Game Center creates matches using a smart matchmaking facility and handles
+ * players by unique char* IDs.
+ *
+ * Game Center also provides functions for scores submission, leaderboards,
+ * achievements, and voice chat (easy VoIP for players connected in a match).
+ *
+ * @supported
+ * - ios: On devices with supported hardware/OS combinations
+ *
+ * For more information on the functionality provided by this API,
+ * and which hardware/OS versions are supported,
+ * see the "iOS Game Center Overview" section of the S3E API
+ * Documentation.
+ *
+ * @{
+ */
+
+/**
+ * The maximum length of a player ID string or string property value used in
+ * the Game Center, including the null terminator. When passing
+ * pointers to functions that return strings, the application must allocate
+ * at least S3E_IOSGAMECENTER_STRING_MAX for each string to guarantee the
+ * function will succeed.
+ *
+ * @par Required Header Files:
+ * s3eIOSGameCenter.h
+ */
+#define S3E_IOSGAMECENTER_STRING_MAX 256
+
+/**
+ * Game Center error codes.
+ *
+ * @see s3eIOSGameCenterGetError
+ * @see s3eIOSGameCenterConnectWithPlayerResult
+ * @see s3eIOSGameCenterConnectionFailureCallbackFn
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef enum s3eIOSGameCenterError
+{
+    /** No Error. */
+    S3E_IOSGAMECENTER_ERR_NONE                        = 0,
+
+    /** Invalid parameter. */
+    S3E_IOSGAMECENTER_ERR_PARAM                       = 1,
+
+    /** The specified callback is already registered. */
+    S3E_IOSGAMECENTER_ERR_ALREADY_REG                 = 3,
+
+    /** Internal device error. */
+    S3E_IOSGAMECENTER_ERR_DEVICE                      = 6,
+
+    /** The action requested is not supported. */
+    S3E_IOSGAMECENTER_ERR_UNSUPPORTED                   = 7,
+
+    /** The system could not perform the desired action because it is in the
+      * wrong state. */
+    S3E_IOSGAMECENTER_ERR_STATE                       = 14,
+
+    /** Game ID not registered/recognised by Game Center. */
+    S3E_IOSGAMECENTER_ERR_GAME_UNRECOGNISED           = 1000,
+
+    /** Local player is not authenticated. */
+    S3E_IOSGAMECENTER_ERR_UNAUTHENTICATED             = 1001,
+
+    /** Local player is awaiting authentication. */
+    S3E_IOSGAMECENTER_ERR_AUTHENTICATION_IN_PROGRESS  = 1002,
+
+    /** Login information for local player was invalid. */
+    S3E_IOSGAMECENTER_ERR_INVALID_CREDENTIALS         = 1003,
+
+    /** Player cannot play this game due to being underage. */
+    S3E_IOSGAMECENTER_ERR_UNDERAGE                    = 1004,
+
+    /** Match is already in progress. */
+    S3E_IOSGAMECENTER_ERR_ALREADY_IN_PROGRESS         = 1006,
+
+    /** Friends list was required but has not been loaded yet. */
+    S3E_IOSGAMECENTER_ERR_FRIENDS_NOT_LOADED          = 1007,
+
+    /** Communication failed, e.g. network unavailable. */
+    S3E_IOSGAMECENTER_ERR_COMMUNICATIONS_FAILURE      = 1008,
+
+    /** The user or OS cancelled an ongoing operation/request. */
+    S3E_IOSGAMECENTER_ERR_CANCELLED                   = 1009,
+
+    /** Operation denied by user. */
+    S3E_IOSGAMECENTER_ERR_USER_DENIED                 = 1010,
+
+    /** Invalid player/player-ID specified. */
+    S3E_IOSGAMECENTER_ERR_INVALID_PLAYER              = 1011,
+
+    /** Score not set. */
+    S3E_IOSGAMECENTER_ERR_SCORE_NOT_SET               = 1012,
+
+    /** Parental controls blocked. */
+    S3E_IOSGAMECENTER_ERR_PARENTAL_CONTROLS_BLOCKED   = 1013,
+
+    /** Invalid match request values specified. */
+    S3E_IOSGAMECENTER_ERR_INVALID_MATCH_REQUEST       = 1014,
+
+    /** Task could not be completed because Game Center is currently
+      * displaying a matchmaking/invite UI. */
+    S3E_IOSGAMECENTER_ERR_MATCHMAKING_IN_PROGRESS     = 1015,
+} s3eIOSGameCenterError;
+
+/**
+ * Game Center properties.
+ *
+ * Basic properties relating to the local player rather than any match.
+ *
+ * @see s3eIOSGameCenterGetInt
+ * @see s3eIOSGameCenterGetString
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef enum s3eIOSGameCenterProperty
+{
+    /** [int] Has local player been authenticated. */
+    S3E_IOSGAMECENTER_LOCAL_PLAYER_IS_AUTHENTICATED     = 0,
+
+    /** [string] Local player ID (if authenticated). */
+    S3E_IOSGAMECENTER_LOCAL_PLAYER_ID                   = 1,
+
+    /** [string] Local player alias (if authenticated). */
+    S3E_IOSGAMECENTER_LOCAL_PLAYER_ALIAS                = 2,
+
+    /** [int] Is local player underage (if authenticated). */
+    S3E_IOSGAMECENTER_LOCAL_PLAYER_IS_UNDERAGE          = 3,
+
+    /** [int] Are friends loaded for the local player (if authenticated). */
+    S3E_IOSGAMECENTER_LOCAL_PLAYER_HAS_FRIENDS_LOADED   = 4,
+} s3eIOSGameCenterProperty;
+
+/**
+ * Reports authentication of the local player completing.
+ *
+ * @param error       Pointer to an s3eIOSGameCenterError value
+ *                    detailing if and why authentication failed.
+ * @param userData    Additional data to pass to the callback function.
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef void  (*s3eIOSGameCenterAuthenticationCallbackFn)(s3eIOSGameCenterError* error, void* userData);
+
+/**
+ * Reports completion of an attempt to loading friend IDs.
+ *
+ * @param error       Pointer to an s3eIOSGameCenterError value
+ *                    detailing if and why loading friends failed.
+ * @param userData    Additional data to pass to the callback function.
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef void  (*s3eIOSGameCenterLoadFriendsCallbackFn)(s3eIOSGameCenterError* error, void* userData);
+
+/**
+ * Describes the level of user activity in the
+ * application or of a group using the application.
+ *
+ * @see s3eIOSGameCenterQueryPlayersActivity
+ * @see s3eIOSGameCenterActivityCallbackFn
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef struct s3eIOSGameCenterActivityInfo
+{
+    /**
+     * Level of activity for the application/group.
+     * Higher value indicates more activity.
+     */
+    int                    m_Activity;
+
+    /**
+     * Error describing a failure to obtain activity information.
+     */
+    s3eIOSGameCenterError      m_Error;
+} s3eIOSGameCenterActivityInfo;
+
+/**
+ * Reports completion of attempt to find the level of user activity in the
+ * application or of a group using the application.
+ *
+ * @see s3eIOSGameCenterQueryPlayersActivity
+ * @see s3eIOSGameCenterActivityInfo
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef void  (*s3eIOSGameCenterActivityCallbackFn)(s3eIOSGameCenterActivityInfo* activityInfo, void* userData);
+
+
+/**
+ * @struct s3eIOSGameCenterPlayer
+ * An opaque reference to a player.
+ *
+ * Players can not be directly created but can be returned by calling
+ * s3eIOSGameCenterGetPlayers() with a list of player IDs. Players in the current
+ * match can be found using s3eIOSGameCenterGetPlayerIDsInMatch().
+ * Players details can be queried using s3eIOSGameCenterPlayerProperty
+ * with s3eIOSGameCenterPlayerGetString() or s3eIOSGameCenterPlayerGetInt().
+ * Players can be uniquely identified using the S3E_IOSGAMECENTER_PLAYER_ID
+ * property, which returns the player's persistent unique ID as registered
+ * with Game Center. This ID should be used internally and NOT be displayed to
+ * any users.
+ *
+ * @see s3eIOSGameCenterPlayerProperty
+ * @see s3eIOSGameCenterPlayerGetInt
+ * @see s3eIOSGameCenterPlayerGetString
+ * @see s3eIOSGameCenterGetPlayers
+ * @see s3eIOSGameCenterInvite
+ * @see s3eIOSGameCenterPlayerInfo
+ * @see s3eIOSGameCenterGetPlayersCallbackFn
+ * @see s3eIOSGameCenterReleasePlayers
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+struct s3eIOSGameCenterPlayer;
+
+/**
+ * Game Center Player properties.
+ *
+ * @see s3eIOSGameCenterPlayer
+ * @see s3eIOSGameCenterPlayerGetInt
+ * @see s3eIOSGameCenterPlayerGetString
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef enum s3eIOSGameCenterPlayerProperty
+{
+   /** [read, string] Unique ID assigned by Game Center. */
+   S3E_IOSGAMECENTER_PLAYER_ID        = 0,
+
+   /** [read, string] Player-chosen string used to identifies the player to
+     * other players. */
+   S3E_IOSGAMECENTER_PLAYER_ALIAS     = 1,
+
+   /** [read, int] Indicates whether player is a friend of the local player.
+     * 1 if yes, 0 if no. */
+   S3E_IOSGAMECENTER_PLAYER_IS_FRIEND = 2,
+} s3eIOSGameCenterPlayerProperty;
+
+/**
+ * Details players found for a hosted match or an error if matchmaking
+ * failed.
+ *
+ * @see s3eIOSGameCenterMatchmakerFindPlayersForHostedRequest
+ * @see s3eIOSGameCenterFindPlayersCallbackFn
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef struct s3eIOSGameCenterPlayerIDsInfo
+{
+    /** Number of players IDs. */
+    int                 m_PlayerCount;
+
+    /** Pointer to an array of player IDs strings. */
+    const char**        m_PlayerIDs;
+
+    /**
+     * Error describing a failure to obtain a list of player IDs. If this is not
+     * S3E_IOSGAMECENTER_ERR_NONE then other values in this struct are invalid.
+     */
+    s3eIOSGameCenterError  m_Error;
+} s3eIOSGameCenterPlayerIDsInfo;
+
+/**
+ * Reports completion of attempt to find a list of player IDs
+ * to be used for a hosted match (through application's own servers,
+ * not Game Center servers).
+ *
+ * @param error       Pointer to an s3eIOSGameCenterPlayerIDsInfo value
+ *                    detailing players found or an error.
+ * @param userData    Additional passed to the callback function.
+ * @see s3eIOSGameCenterMatchmakerFindPlayersForHostedRequest
+ * @see s3eIOSGameCenterPlayerIDsInfo
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef void  (*s3eIOSGameCenterFindPlayersCallbackFn)(s3eIOSGameCenterPlayerIDsInfo* playersInfo, void* userData);
+
+
+/**
+ * Match properties.
+ *
+ * @see s3eIOSGameCenterGetInt
+ * @see s3eIOSGameCenterGetString
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef enum s3eIOSGameCenterMatchProperty
+{
+    /**
+     * [read, int] Get the expected number of players in the match.
+     */
+    S3E_IOSGAMECENTER_MATCH_EXPECTED_PLAYERS = 0
+} s3eIOSGameCenterMatchProperty;
+
+/**
+ * Structure used to specify requirements when matchmaking.
+ *
+ * This specifies requirements that other players must fulfill in order to join
+ * the same match as the local player. To join a match, this structure should
+ * be populated with the desired values and passed to one of the matchmaking
+ * functions.
+ *
+ * @see s3eIOSGameCenterMatchmakerFindPlayersForHostedRequest
+ * @see s3eCenterMatchmakerGUI
+ * @see s3eIOSGameCenterMatchmakerCreateMatch
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef struct s3eIOSGameCenterMatchRequest
+{
+    /**
+     * Is the match to be hosted externally from Game Center?
+     * This is only used when matchmaking via the GUI.
+     * Setting it to true is the equivalent of using
+     * s3eIOSGameCenterMatchmakerFindPlayersForHostedRequest()
+     * while false is the equivalent of using
+     * s3eIOSGameCenterMatchmakerCreateMatch(). */
+    s3eBool  m_Hosted;
+
+    /** Maximum number of players that can join the match. */
+    int    m_MaxPlayers;
+
+    /** Minimum number of players that can join the match. */
+    int    m_MinPlayers;
+
+    /**
+     * Application-defined number that allows more than one
+     * match to run per app: All players must set this to the
+     * same value for successful matchmaking.
+     */
+    int    m_PlayerGroup;
+
+    /**
+     * Set true if the players must all have corresponding values
+     * set for m_PlayerAttributes, or false to ignore m_PlayerAttributes.
+     */
+    s3eBool m_UsePlayerAttributes;
+
+    /**
+     * Player attribute flag mask. If m_UsePlayerAttributes is true,
+     * this value is used to limit the matchmaking to only find players
+     * whose m_PlayerAttributes masks collectively satisfy the following
+     * requirements: 1) All players' masks when ANDed equal zero, 2) All
+     * players' masks when ORed equal 0xFFFFFFFF.
+     * This means that no bit in a players mask can be set to 1 if
+     * another player's mask has the same bit set to 1, and that between
+     * the players their masks must include a value of 1 for all of the
+     * 32 bits. Use this setting when a match requires a set amount of
+     * players, each of which must be of a different application-specified
+     * type. e.g. A 4 player co-op game where each player must have chosen one
+     * of 4 different characters. Ignored if m_UsePlayerAttributes is false.
+     */
+    uint32 m_PlayerAttributes;
+
+    /** Specify a specific list of player IDs. */
+    char** m_PlayersToInvite;
+
+    /** Size of the m_PlayersToInvite array. */
+    int    m_NumPlayersToInvite;
+} s3eIOSGameCenterMatchRequest;
+
+/**
+ * Structure detailing an invitation to join a game.
+ *
+ * m_InviteID is an internally managed token which can be used to accept or
+ * reject the invitation.
+ *
+ * @see s3eIOSGameCenterInviteCallbackFn
+ * @see s3eIOSGameCenterInvite
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef struct s3eIOSGameCenterInvite
+{
+    /**
+     * ID of the player who sent the invite.
+     */
+    char m_InviterID[S3E_IOSGAMECENTER_STRING_MAX];
+
+    /**
+     * True if the game is hosted (uses own network infrastructure rather than
+     * Game Center servers).
+     */
+    s3eBool               m_Hosted;
+
+    /**
+     * False by default. Leave false if the invite is to be processed during
+     * s3eIOSGameCenterInviteReceivedCallbackFn (by calling s3eIOSGameCenterInviteAcceptGUI)
+     * or if the invite is to be immediately rejected without displaying the GUI.
+     * Set true if the invite is to be processed later, in which case a pointer to
+     * m_InviteID should be stored and s3eIOSGameCenterInviteAcceptGUI() must be called
+     * from outside of the callback function, using the stored value.
+     */
+    s3eBool               m_RetainInviteID;
+
+    /**
+     * Total number of players that were invited (size of m_AllPlayersToInvite).
+     */
+    int                   m_AllPlayersCount;
+
+    /**
+     * List of all players that were invited to join the match.
+     */
+    s3eIOSGameCenterPlayer** m_AllPlayersToInvite;
+
+    /**
+     * False by default. Leave false if m_AllPlayersToInvite is no longer required
+     * after s3eIOSGameCenterInviteReceivedCallbackFn completes. Set true to retain
+     * the player array for later use, in which case it must be freed later using
+     * s3eIOSGameCenterReleasePlayers().
+     */
+    bool                  m_RetainPlayers;
+
+    /**
+     * An opaque invitation ID
+     * Use this to accept/reject an invitation.
+     */
+    void*  m_InviteID;
+} s3eIOSGameCenterInvite;
+
+/**
+ * Reports the user accepting an invitation to join a match.
+ *
+ * The player is always shown a native "accept/reject" dialog as soon as an
+ * invite is received. This function is only called when the user chooses
+ * to accept via the GUI. At this point, the invite can still be
+ * rejected by the app, or passed to s3eIOSGameCenterInviteAcceptGUI() to
+ * launch the matchmaking GUI and add the local player to the match.
+ *
+ * - To reject an invitation immediately, leave the m_RetainInviteID flag of
+ *   inviteRequest set to false and do not pass m_InviteID to the GUI. Once the
+ *   callback has completed, m_InviteID will no longer be valid.
+ * - To launch the matchmaking GUI during the callback, leave the
+ *   m_RetainInviteID flag set to false and call
+ *   s3eIOSGameCenterInviteAcceptGUI(m_InviteID, ...) from within this callback.
+ *   Once the callback has completed, the m_InviteID will no longer be valid.
+ * - To launch the matchmaking GUI later, set m_RetainInviteID to true and
+ *   store a pointer to m_InviteID to pass to s3eIOSGameCenterInviteAcceptGUI().
+ * - Once passed to s3eIOSGameCenterInviteAcceptGUI(), an invite is automatically
+ *   released and no longer valid.
+ * - s3eIOSGameCenterReleaseInvite() should be used to release retained invites if
+ *   they no longer need to be processed by the user.
+ *
+ * @see s3eIOSGameCenterInvite
+ * @see s3eIOSGameCenterInviteAcceptGUI
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef void (*s3eIOSGameCenterInviteCallbackFn)(s3eIOSGameCenterInvite* inviteRequest);
+
+/**
+ * Reports the result of an attempted Game Center operation. This is used by
+ * several different function to report asynchronous completion.
+ *
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef void (*s3eIOSGameCenterOperationCompleteCallbackFn)(s3eIOSGameCenterError* error);
+
+/**
+ * Reports completion of attempt to create a new match.
+ *
+ * Match was successfully started if @e error is S3E_IOSGAMECENTER_ERR_NONE.
+ *
+ * @see s3eIOSGameCenterMatchmakerCreateMatch
+ * @see s3eIOSGameCenterError
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef void (*s3eIOSGameCenterCreateMatchCallbackFn)(s3eIOSGameCenterError* error, void* userData);
+
+/**
+ * Reports matchmaking complete after adding new players to a match.
+ *
+ * @see s3eIOSGameCenterMatchmakerAddPlayersToMatch
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef void (*s3eIOSGameCenterAddPlayersToMatchCallbackFn)(s3eIOSGameCenterError* error, void* userData);
+
+
+/**
+ * Match send data modes.
+ *
+ * @see s3eIOSGameCenterSendDataToPlayers
+ * @see s3eIOSGameCenterSendDataToAllPlayers
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef enum s3eIOSGameCenterMatchSendDataMode
+{
+   /**
+    * Continues to send the data until it is successfully transmitted or the connection times out.
+    * Reliable transmissions will be delivered in the order they were sent. Use this when you need
+    * to guarantee delivery..
+    */
+   S3E_IOSGAMECENTER_MATCH_SEND_DATA_RELIABLE = 0,
+
+   /**
+    * Sends the data once and does not retry if an error occurred. Data
+    * transmitted unreliably can be received out of order by
+    * recipients. Use this for small packets of data that must arrive quickly
+    * to be of any use to the recipient.
+    */
+   S3E_IOSGAMECENTER_MATCH_SEND_DATA_UNRELIABLE = 1
+} s3eIOSGameCenterMatchSendDataMode;
+
+/**
+ * Structure to describe a chunk of data received from a player.
+ *
+ * @ref s3eIOSGameCenterSessionReceivedData
+ * @see s3eIOSGameCenterSessionReceiveDataCallbackFn
+ * @see s3eIOSGameCenterStartSession
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef struct s3eIOSGameCenterReceivedData
+{
+    /**
+     * String ID of the player that sent the data. Only valid for duration
+     * of the callback.
+     */
+    char        m_PlayerID[S3E_IOSGAMECENTER_STRING_MAX];
+
+    /** Size of m_Data in bytes. */
+    int         m_DataSize;
+
+    /** Pointer to data. */
+    const char* m_Data;
+} s3eIOSGameCenterReceivedData;
+
+/**
+ * Callback to report that data has been received from a peer.
+ *
+ * Note that @e data is only valid for the duration of the function it is
+ * returned to. The data inside this structure should be copied from it during
+ * the callback. The player information may persist if the player remains valid
+ * but persistence should not be assumed.
+ *
+ * @param data     Pointer to an s3eIOSGameCenterReceivedData structure
+ *                 detailing the received data and player that sent it.
+ * @see s3eIOSGameCenterSendDataToPlayers
+ * @see s3eIOSGameCenterSendDataToAllPlayers
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef void (*s3eIOSGameCenterReceiveDataCallbackFn)(s3eIOSGameCenterReceivedData* data);
+
+/**
+ * Game Center Player connection states.
+ *
+ * @see s3eIOSGameCenterPlayer
+ * @see s3eIOSGameCenterPlayerStateChangeInfo
+ * @see s3eIOSGameCenterPlayerStateChangeCallbackFn
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef enum s3eIOSGameCenterPlayerConnectionState
+{
+   /** Player state is not known so cannot receive data. */
+   S3E_IOSGAMECENTER_PLAYER_STATE_UNKNOWN   = 0,
+
+   /** Player is connected and can receive data */
+   S3E_IOSGAMECENTER_PLAYER_STATE_CONNECTED = 1,
+
+   /** Player is disconnected and cannot receive data. */
+   S3E_IOSGAMECENTER_PLAYER_STATE_DISCONNECTED = 2,
+} s3eIOSGameCenterPlayerConnectionState;
+
+/**
+ * Structure used to accept or reject a request from a peer to connect to the
+ * current session.
+ *
+ * @see s3eIOSGameCenterPlayerStateChangeCallbackFn
+ * @see s3eIOSGameCenterPlayerConnectionState
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef struct s3eIOSGameCenterPlayerStateChangeInfo
+{
+    /** The ID of the player whose connection state has changed. */
+    char   m_PlayerID[S3E_IOSGAMECENTER_STRING_MAX];
+
+    /** Indicates the new connection state. */
+    s3eIOSGameCenterPlayerConnectionState  m_State;
+} s3eIOSGameCenterPlayerStateChangeInfo;
+
+/**
+ * Structure used to report an attempted connection to a player failing.
+ *
+ * @see s3eIOSGameCenterConnectToPlayerFailureCallbackFn
+ * @see s3eIOSGameCenterError
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef struct s3eIOSGameCenterConnectWithPlayerResult
+{
+    /** The player that the connection failure occurred with. */
+    char m_PlayerID[S3E_IOSGAMECENTER_STRING_MAX];
+
+    /** Error describing a reason for connection failure. */
+    s3eIOSGameCenterError m_Error;
+} s3eIOSGameCenterConnectWithPlayerResult;
+
+/**
+ * Structure detailing a list of players.
+ *
+ * This will be returned via a callback when s3eIOSGameCenterGetPlayers() is
+ * called with a list of player IDs. Each player is represented as an
+ * s3eIOSGameCenterPlayer. Player information can be queried for each of these
+ * players using GetInt/String functions. Players must be explicitly
+ * released using s3eIOSGameCenterReleasePlayers() when no longer required.
+ *
+ * @see s3eIOSGameCenterGetPlayersCallbackFn
+ * @see s3eIOSGameCenterGetPlayers
+ * @see s3eIOSGameCenterPlayerGetInt
+ * s3eIOSGameCenterPlayerGetString
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef struct s3eIOSGameCenterPlayerInfo
+{
+    /** Number of players (size of m_Players array). */
+    int                           m_PlayerCount;
+
+    /**
+     * Pointer to an array of players in the match, if m_PlayerCount indicates
+     * that there are any and m_Error indicates no error occurred. m_Players
+     * must be released using s3eIOSGameCenterReleasePlayers() when finished with.
+     */
+    struct s3eIOSGameCenterPlayer**   m_Players;
+
+    /**
+     * Error describing a failure to obtain a list of players. If this is not
+     * S3E_IOSGAMECENTER_ERR_NONE then other values in this struct are invalid.
+     */
+    s3eIOSGameCenterError             m_Error;
+} s3eIOSGameCenterPlayerInfo;
+
+/**
+ * Callback to report that a list of players has been received following a call
+ * to s3eIOSGameCenterGetPlayers().
+ *
+ * Note that while the playersInfo structure itself is only valid for the
+ * duration of the callback function, the array of players in playersInfo
+ * stays valid until they are freed with a call to
+ * s3eIOSGameCenterReleasePlayers(). This callback is the only valid way to
+ * retrieve s3eIOSGameCenterPlayer objects and players should not be freed
+ * manually.
+ *
+ * @param playersInfo Pointer to an s3eIOSGameCenterPlayerInfo structure
+ *                    detailing the list of players.
+ * @see s3eIOSGameCenterPlayerInfo
+ * @see s3eIOSGameCenterPlayer
+ * @see s3eIOSGameCenterGetPlayers
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef void (*s3eIOSGameCenterGetPlayersCallbackFn)(s3eIOSGameCenterPlayerInfo* playersInfo);
+
+/**
+ * Callback to report that a peer is attempting to connect.
+ * @param stateChange   Pointer to an s3eIOSGameCenterPlayerStateChangeInfo struct
+ *                      detailing the player and new connection state.
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef void (*s3eIOSGameCenterPlayerStateChangeCallbackFn)(s3eIOSGameCenterPlayerStateChangeInfo* stateChange);
+
+/**
+ * Callback to report failure to connect with a specific player.
+ *
+ * @param result      Pointer to an s3eGKSessionConnectResult structure
+ *                    detailing the player and reason for failure.
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef void  (*s3eIOSGameCenterConnectToPlayerFailureCallbackFn)(s3eIOSGameCenterConnectWithPlayerResult* result);
+
+/**
+ * Reports a peer's disconnection or that an error occurred during the session.
+ * An error value in info indicates that a serious error has occurred while
+ * handling the session and that it should be stopped. The application is then
+ * responsible for stopping the session using s3eIOSGameKitStopSession.
+ *
+ * @param error       Pointer to an s3eIOSGameCenterError value
+ *                    detailing the reason for failure.
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef void  (*s3eIOSGameCenterConnectionFailureCallbackFn)(s3eIOSGameCenterError* error);
+
+/**
+ * Structure for specifying a list of callbacks that will be called during a
+ * match.
+ *
+ * @see s3eIOSGameCenterMatchmakerGUI
+ * @see s3eIOSGameCenterInviteAcceptGUI
+ * @see s3eIOSGameCenterMatchmakerCreateMatch
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef struct s3eIOSGameCenterMatchCallbacks
+{
+    s3eIOSGameCenterConnectionFailureCallbackFn m_ConnectionFailureCB;
+    s3eIOSGameCenterConnectToPlayerFailureCallbackFn m_ConnectToPlayerFailureCB;
+    s3eIOSGameCenterPlayerStateChangeCallbackFn m_PlayerStateChangeCB;
+    s3eIOSGameCenterReceiveDataCallbackFn m_ReceiveDataCB;
+} s3eIOSGameCenterMatchCallbacks;
+
+
+/**
+ * @struct s3eIOSGameCenterLeaderboard
+ * An opaque reference to a leaderboard.
+ *
+ * @see s3eIOSGameCenterCreateLeaderboard
+ * @see s3eIOSGameCenterLeaderboardProperty
+ * @see s3eIOSGameCenterLeaderboardGetInt
+ * @see s3eIOSGameCenterLeaderboardSetInt
+ * @see s3eIOSGameCenterLeaderboardGetString
+ * @see s3eIOSGameCenterLeaderboardSetString
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+struct s3eIOSGameCenterLeaderboard;
+
+/**
+ * Representation of a player's score. Used for submitting new scores
+ * to the server and for retrieving scores. Members marked as [read] but
+ * not [write] will be ignored when used to submit a new score.
+ */
+typedef struct s3eIOSGameCenterScore
+{
+    /** [read, write] ID of the player the score is for. */
+    char   m_PlayerID[S3E_IOSGAMECENTER_STRING_MAX];
+
+    /** [read, write] Category (game type/leaderboard) the score was
+        returned for. Note that this will be the same as the value
+        specified for the category when s3eIOSGameCenterLeaderboardLoadScores()
+        was called. Therefore, it will be null if the score was returned
+        by a query that did not specify a category, even though the score
+        will have been reported for a specific category originally. */
+    char   m_Category[S3E_IOSGAMECENTER_STRING_MAX];
+
+    /** [read] Date the score was awarded in milliseconds since the epoch */
+    int64  m_Date;
+
+    /** [read, write] Raw value of the score. The application can interpret this
+        how it wants and should specify the details through game center/
+        iTunes Connect. */
+    int64  m_Value;
+
+    /** [read] Localised string version of m_Value. */
+    char   m_FormattedValue[S3E_IOSGAMECENTER_STRING_MAX];
+
+    /** [read] Position of score in results of a leaderboard search. */
+    int    m_Rank;
+
+    int pad;
+} s3eIOSGameCenterScore;
+
+/**
+ * Player scope values used for S3E_IOSGAMECENTER_LEADERBOARD_PLAYER_SCOPE.
+ */
+typedef enum s3eIOSGameCenterPlayerScope
+{
+    /** Scope limited by players. */
+    S3E_IOSGAMECENTER_PLAYER_SCOPE_GLOBAL       = 0,
+
+    /** Scope limited to friends of the local player only. */
+    S3E_IOSGAMECENTER_PLAYER_SCOPE_FRIENDS_ONLY = 1,
+} s3eIOSGameCenterPlayerScope;
+
+/**
+ * Time scope values used for S3E_IOSGAMECENTER_LEADERBOARD_TIME_SCOPE.
+ */
+typedef enum s3eIOSGameCenterTimeScope
+{
+    /** Scope limited to today. */
+    S3E_IOSGAMECENTER_TIME_SCOPE_TODAY      = 0,
+
+    /** Scope limited to the last seven days. */
+    S3E_IOSGAMECENTER_PLAYER_SCOPE_WEEK     = 1,
+
+    /** Scope not limited by time. */
+    S3E_IOSGAMECENTER_PLAYER_SCOPE_ALL_TIME = 2,
+} s3eIOSGameCenterTimeScope;
+
+/**
+ * Leaderboard Properties.
+ *
+ * @see s3eIOSGameCenterLeaderboardGetInt
+ * @see s3eIOSGameCenterLeaderboardSetInt
+ * @see s3eIOSGameCenterLeaderboardGetString
+ * @see s3eIOSGameCenterLeaderboardSetString
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef enum s3eIOSGameCenterLeaderboardProperty
+{
+    /**
+     * [read, write, string]
+     * Set/get the current category to use when retrieving scores.
+     * This can be left/set to null in order to specify that any
+     * score should be returned, regardless of the category/
+     * leaderboard it belongs to. Note that in this case, any scores
+     * returned after calling s3eIOSGameCenterLeaderboardLoadScores()
+     * will have their m_Category value set to null as well.
+     */
+    S3E_IOSGAMECENTER_LEADERBOARD_CATEGORY = 0,
+
+    /**
+     * [read, write, int]
+     * Set/get the start of the range of scores to retrieve.
+     */
+    S3E_IOSGAMECENTER_LEADERBOARD_RANGE_START = 2,
+
+    /**
+     * [read, write, int] ....
+     * Set/get the size of the range of scores to retrieve.
+     */
+    S3E_IOSGAMECENTER_LEADERBOARD_RANGE_SIZE = 3,
+
+    /** [read, write, int] .... */
+    S3E_IOSGAMECENTER_LEADERBOARD_PLAYER_SCOPE = 1,
+
+    /** [read, write, int] .... */
+    S3E_IOSGAMECENTER_LEADERBOARD_TIME_SCOPE = 4,
+
+    /**
+     * [read, string]
+     * Get the title of the current leaderboard.
+     */
+    S3E_IOSGAMECENTER_LEADERBOARD_TITLE = 5,
+
+    /** [read, string] .... */
+    S3E_IOSGAMECENTER_LEADERBOARD_MAX_RANGE = 6,
+} s3eIOSGameCenterLeaderboardProperty;
+
+/**
+ * Structure .
+ *
+ * @see s3eIOSGameCenterLoadScoresCallbackFn
+ * @see s3eIOSGameCenterLeaderboardSetInt
+ * @see s3eIOSGameCenterLeaderboardGetString
+ * @see s3eIOSGameCenterLeaderboardSetString
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef struct s3eIOSGameCenterLoadScoresResult
+{
+    /** Number of scores returned. */
+    int                     m_ScoreCount;
+
+    /** Pointer to an array of scores matching the leaderboard parameters. */
+    s3eIOSGameCenterScore*     m_Scores;
+
+    /** Pointer to the score for the local player on this leaderboard. */
+    s3eIOSGameCenterScore*     m_LocalPlayerScore;
+
+    /** Error describing a failure to obtain a list of scores. If this is not
+     *  S3E_IOSGAMECENTER_ERR_NONE then other values in this struct are invalid. */
+    s3eIOSGameCenterError      m_Error;
+} s3eIOSGameCenterLoadScoresResult;
+
+/**
+ * Reports completion of attempt to load a list of scores for a leaderboard
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef void  (*s3eIOSGameCenterLoadScoresCallbackFn)(s3eIOSGameCenterLoadScoresResult* scoresResult);
+
+/**
+ * Describes the result of an attempt to load leaderboard categories,
+ * detailing the categories global and localised names if found.
+ *
+ * @see s3eIOSGameCenterLeaderboardLoadCategories
+ * @see s3eIOSGameCenterLeaderboardLoadCategoriesCallbackFn
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef struct s3eIOSGameCenterLoadCategoriesResult
+{
+    /** Number of categories returned. */
+    int                 m_CategoriesCount;
+
+    /** Array of categories for the application. */
+    char**              m_Categories;
+
+    /** Array of localised titles, each for the corresponding category in m_Categories by index. */
+    char**              m_Titles;
+
+    /** Error describing a failure to obtain a list of categories. If this is not
+     *  S3E_IOSGAMECENTER_ERR_NONE then other values in this struct are invalid. */
+    s3eIOSGameCenterError  m_Error;
+} s3eIOSGameCenterLoadCategoriesResult;
+
+/**
+ * Reports completion of attempt to load leaderboard categories.
+ *
+ * @see s3eIOSGameCenterLeaderboardLoadCategories
+ * @see s3eIOSGameCenterLoadCategoriesResult
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef void  (*s3eIOSGameCenterLeaderboardLoadCategoriesCallbackFn)(s3eIOSGameCenterLoadCategoriesResult* result);
+
+/**
+ * Detailed information for an achievement.
+ *
+ * @see s3eIOSGameCenterAchievementInfoList
+ * @see s3eIOSGameCenterLoadAchievementInfoCallbackFn
+ * @see s3eIOSGameCenterLoadAchievementInfo
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef struct s3eIOSGameCenterAchievementInfo
+{
+    char    m_Identifier[S3E_IOSGAMECENTER_STRING_MAX];
+    char    m_Title[S3E_IOSGAMECENTER_STRING_MAX];
+    char    m_AchievedDescription[S3E_IOSGAMECENTER_STRING_MAX];
+    char    m_UnachievedDescription[S3E_IOSGAMECENTER_STRING_MAX];
+    int     m_MaxPoints;;
+    s3eBool m_Hidden;
+} s3eIOSGameCenterAchievementInfo;
+
+/**
+ * Contains a list of achievement information structures returned from a call
+ * to s3eIOSGameCenterLoadAchievementInfo() or an error if the call failed.
+ *
+ * @see s3eIOSGameCenterAchievementInfo
+ * @see s3eIOSGameCenterLoadAchievementInfoCallbackFn
+ * @see s3eIOSGameCenterLoadAchievementInfo
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef struct s3eIOSGameCenterAchievementInfoList
+{
+    s3eIOSGameCenterAchievementInfo* m_Achievements;
+    int m_AchievementCount;
+    s3eIOSGameCenterError m_Error;
+} s3eIOSGameCenterAchievementInfoList;
+
+/**
+ * Reports loading of a list of achievements.
+ *
+ * @see s3eIOSGameCenterAchievementInfo
+ * @see s3eIOSGameCenterAchievementInfoList
+ * @see s3eIOSGameCenterLoadAchievementInfo
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef void (*s3eIOSGameCenterLoadAchievementInfoCallbackFn)(s3eIOSGameCenterAchievementInfoList* list);
+
+/**
+ * Defines an achievement.
+ *
+ * @see s3eIOSGameCenterLoadAchievements
+ * @see s3eIOSGameCenterLoadAchievementInfo
+ * @see s3eIOSGameCenterReportAchievement
+ * @see s3eIOSGameCenterAchievementsReset
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef struct s3eIOSGameCenterAchievement
+{
+    /** Unique identifier for the achievement */
+    char    m_Identifier[S3E_IOSGAMECENTER_STRING_MAX];
+
+    /** Percentage complete */
+    int     m_PercentComplete;
+} s3eIOSGameCenterAchievement;
+
+/**
+ * Defines a list of achievements returned or an error if achievements were
+ * not found.
+ *
+ * @see s3eIOSGameCenterLoadAchievements
+ * @see s3eIOSGameCenterLoadAchievementsCallbackFn
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef struct s3eIOSGameCenterAchievementList
+{
+    /** List of achievements */
+    s3eIOSGameCenterAchievement* m_Achievements;
+
+    /** Number of achievements */
+    int m_AchievementCount;
+
+    /** Error if loading achievements failed */
+    s3eIOSGameCenterError m_Error;
+} s3eIOSGameCenterAchievementList;
+
+/**
+ * Callback called when achievements have been laoded.
+ *
+ * @see s3eIOSGameCenterLoadAchievements
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef void (*s3eIOSGameCenterLoadAchievementsCallbackFn)(s3eIOSGameCenterAchievementList* list);
+
+
+/**
+ * @struct s3eIOSGameCenterVoiceChat
+ * An opaque reference to a voice chat session between players.
+ *
+ * On iPhone this is the equivalent of the GKVoiceChat class.
+ * The Game Center currently only supports a single chat session at
+ * a time.
+ *
+ * @see s3eIOSGameCenterVoiceChatOpenChannel
+ * @see s3eIOSGameCenterVoiceChatCloseChannel
+ * @see s3eIOSGameCenterVoiceChatProperty
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+struct s3eIOSGameCenterVoiceChat;
+
+/**
+ * Voice chat states.
+ *
+ * @see s3eIOSGameCenterVoiceChatPlayerState
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef enum s3eIOSGameCenterVoiceChatState
+{
+    /** Given player is connected */
+    S3E_IOSGAMECENTER_VOICE_CHAT_CONNECTED         = 0,
+
+    /** Given player is disconnected */
+    S3E_IOSGAMECENTER_VOICE_CHAT_DISCONNECTED      = 1,
+
+    /** Given player is speaking */
+    S3E_IOSGAMECENTER_VOICE_CHAT_SPEAKING          = 2,
+
+    /** Given player is silent */
+    S3E_IOSGAMECENTER_VOICE_CHAT_SILENT            = 3
+} s3eIOSGameCenterVoiceChatState;
+
+/**
+ * Describes the voice chat state for a particular player.
+ *
+ * @see s3eIOSGameCenterVoiceChatPlayerState
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef struct s3eIOSGameCenterVoiceChatPlayerState
+{
+    /** ID of player whose state has changed */
+    char                            m_PlayerID[S3E_IOSGAMECENTER_STRING_MAX];
+
+    /** New state of the given player */
+    s3eIOSGameCenterVoiceChatState     m_State;
+} s3eIOSGameCenterVoiceChatPlayerState;
+
+/**
+ * Callback called whenever any player's voice chat state changes.
+ *
+ * @see s3eIOSGameCenterSetVoiceChatUpdateHandler
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef void (*s3eIOSGameCenterVoiceChatUpdateCallbackFn)(s3eIOSGameCenterVoiceChatPlayerState* state);
+
+/**
+ * Voice chat properties.
+ *
+ * @see s3eIOSGameCenterVoiceChatGetInt
+ * @see s3eIOSGameCenterVoiceChatSetInt
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+typedef enum s3eIOSGameCenterVoiceChatProperty
+{
+    /** 1 indicates the given channel is started, 0 stopped. */
+    S3E_IOSGAMECENTER_VOICE_CHAT_START         = 0,
+
+    /** 1 indicates the given channel session is active, 0 inactive. */
+    S3E_IOSGAMECENTER_VOICE_CHAT_ACTIVE        = 1,
+
+    /** Volume of the given channel. */
+    S3E_IOSGAMECENTER_VOICE_CHAT_VOLUME        = 2
+} s3eIOSGameCenterVoiceChatProperty;
+
+
+functions:
+
+/**
+ * Get general game center property integer values.
+ *
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+int32 s3eIOSGameCenterGetInt(s3eIOSGameCenterProperty property) -1
+
+/**
+ * Get general game center property string values.
+ *
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+const char* s3eIOSGameCenterGetString(s3eIOSGameCenterProperty property) ""
+
+/**
+ * Authenticate the local player.
+ *
+ * This must be called and the player must be authenticated in order to
+ * use any other game center functions.
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+s3eResult s3eIOSGameCenterAuthenticate(s3eIOSGameCenterAuthenticationCallbackFn authenticationCB, void* userData) S3E_RESULT_ERROR runonmainthread
+
+/**
+ * Load a list of friends for the local player asynchronously.
+ *
+ * Once the callback has been called and indicated that it succeeded (no error
+ * value set), a list of friends can be obtained by calling
+ * s3eIOSGameCenterGetFriendIDs()
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+s3eResult s3eIOSGameCenterLoadFriends(s3eIOSGameCenterLoadFriendsCallbackFn loadFriendsCB, void* userData) S3E_RESULT_ERROR runonmainthread
+
+/**
+ * Get a list of player IDs for friends of the local player.
+ *
+ * Local player must be authenticated and s3eIOSGameCenterLoadFriendsCallbackFn
+ * must have been called at least once. If friendIDs is not NULL, it must be a
+ * valid pointer to an array of char* strings, with each string of length at
+ * least S3E_IOSGAMECENTER_STRING_MAX and the array at least maxFriendIDs in size.
+ * The function will return the actual amount of friends, which may be more
+ * than maxFriends. If friendIDs is NULL, the function will simply return the
+ * amount of friends.
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+int32 s3eIOSGameCenterGetFriendIDs(char** friendIDs, int maxFriendIDs) -1
+
+/**
+ * Query for activity level of either the whole application if playerGroup==0,
+ * or a group of players using the application otherwise.
+ *
+ * Only supports one ongoing request at a time.
+ * To cancel an existing request, pass queryActivityCB=NULL.
+ * @see s3eIOSGameCenterActivityCallbackFn
+ * @see s3eIOSGameCenterActivityInfo
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+s3eResult s3eIOSGameCenterQueryPlayersActivity(s3eIOSGameCenterActivityCallbackFn queryActivityCB, int playerGroup, void* userData) S3E_RESULT_ERROR runonmainthread
+
+/**
+ * Register callback function to be called whenever an invite is received from
+ * a matches created by other users.
+ *
+ * This should be called as early as possible in an application using
+ * Game Center (otherwise invites may be ignored).
+ * Passing NULL for inviteListenerCB stops the application
+ * processing invitations.
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+s3eResult s3eIOSGameCenterSetInviteHandler(s3eIOSGameCenterInviteCallbackFn callback) S3E_RESULT_ERROR runonmainthread
+
+/**
+ * Find players for a match to be hosted externally from Game Center.
+ *
+ * This allows Game Center to do the matchmaking and find players IDs but these
+ * can then be used to host a match on the application's own servers without
+ * any further use of the Game Center servers or data-sending functionality.
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+s3eResult s3eIOSGameCenterMatchmakerFindPlayersForHostedRequest(s3eIOSGameCenterMatchRequest* request, s3eIOSGameCenterFindPlayersCallbackFn findPlayersCB, void* userData) S3E_RESULT_ERROR runonmainthread
+
+/**
+ * Start match using GUI.
+ *
+ * This will open the Game Center app and allow the user to complete
+ * matchmaking manually. The request data is used as a starting point
+ * and the user selects players to create the match with.
+ *
+ * @param request       Specifies the initial matchmaking requirements.
+ * @param callbacks     Structure difining a set of callbacks to be called for
+ *                      events once the match has started.
+ * @ return
+ * - @ref S3E_RESULT_SUCCESS if a match is successfully started.
+ * - @ref S3E_RESULT_ERROR   if Game Center fails to start a match.
+ *   Call s3eIOSGameCenterGetError() to retrieve an error code.
+ *
+ * @see s3eIOSGameCenterMatchRequest
+ * @see s3eIOSGameCenterMatchCallbacks
+ * @see s3eIOSGameCenterMatchmakerCreateMatch
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+s3eResult s3eIOSGameCenterMatchmakerGUI(s3eIOSGameCenterMatchRequest* request, s3eIOSGameCenterMatchCallbacks* callbacks) S3E_RESULT_ERROR
+
+/**
+ * Start match using GUI.
+ *
+ * This will open the Game Center app and allow the user to complete
+ * matchmaking manually for an externally hosted match. The request data is used
+ * as a starting point and the user selects players to create the match with.
+ * On success, Game Center will generate a list of players and return them
+ * to findPlayersCB as with s3eIOSGameCenterMatchmakerFindPlayersForHostedRequest.
+ *
+ * @param request       Specifies the initial matchmaking requirements.
+ * @param findPlayersCB Callback function that players will be returned to if
+ *                      matchmaking succeeds. This will be called in the next
+ *                      device yield after this function returns.
+ * @ return
+ * - @ref S3E_RESULT_SUCCESS if a match is successfully started.
+ * - @ref S3E_RESULT_ERROR   if Game Center fails to start a match.
+ *   Call s3eIOSGameCenterGetError() to retrieve an error code.
+ *
+ * @see s3eIOSGameCenterMatchRequest
+ * @see s3eIOSGameCenterMatchCallbacks
+ * @see s3eIOSGameCenterMatchmakerFindPlayersForHostedRequest
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+s3eResult s3eIOSGameCenterMatchmakerHostedGUI(s3eIOSGameCenterMatchRequest* request, s3eIOSGameCenterFindPlayersCallbackFn findPlayersCB) S3E_RESULT_ERROR
+
+/**
+ * Show GUI to allow user to accept or reject an invite.
+ *
+ * This should be called to allow the user to respond to an invite.
+ * inviteID must be a token obtained from a call to
+ * s3eIOSGameCenterInviteCallbackFn.
+ * If this function is called when a native Game Center UI is already
+ * in use - i.e. the player is currently matchmaking - then it will always
+ * fail, return S3E_FALSE and set the error code to
+ * S3E_IOSGAMECENTER_ERR_MATCHMAKING_IN_PROGRESS. This is possible if this
+ * function is called during a call to s3eIOSGameCenterInviteCallbackFn. In this
+ * case, it is sensible to retain the inviteID and re-call
+ * s3eIOSGameCenterMatchmakerHostedGUI once matchmaking fails/is cancelled.
+ *
+ * @param request       Specifies the matchmaking requirements.
+ * @param createMatchCB Function called when match creation has completed.
+ * @param callbacks     Structure difining a set of callbacks to be called for
+ *                      events once the match has started.
+ * @return
+ * - @ref S3E_TRUE   if the GUI is displayed, the user accepts the invitation.
+ * - @ref S3E_FALSE  if the GUI cannot display or user/OS cancels the invitate.
+ *   Call s3eIOSGameCenterGetError() to retrieve an error code. This will return:
+ *   - S3E_IOSGAMECENTER_ERR_MATCHMAKING_IN_PROGRESS if the GUI cannot be
+ *     displayed because another matchmaking interface is already in use.
+ *   - S3E_IOSGAMECENTER_ERR_CANCELLED if the user/OS cancelled the dialog.
+ *
+ * @see s3eIOSGameCenterSetInviteHandler
+ * @see s3eIOSGameCenterInviteCallbackFn
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+s3eBool s3eIOSGameCenterInviteAcceptGUI(void* inviteID, s3eIOSGameCenterMatchCallbacks* callbacks) S3E_RESULT_ERROR
+
+/**
+ * Explicitly release an invite that is not wanted. Required if matchmaking is
+ * no longer needed but the application still has an outstanding inviteID
+ * that was retained from s3eIOSGameCenterInviteCallbackFn.
+ *
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+s3eResult s3eIOSGameCenterReleaseInvite(void* inviteID) S3E_RESULT_ERROR runonmainthread
+
+/**
+ * Starts matchmaking pragmatically.
+ *
+ * The @e request is used to specify criteria that other players must meet to
+ * be able to join the same match as the local player. The Game Center app will
+ * be launched and control will switch back to this application once a match
+ * has either started or failed, at which point @e createMatchCB will be
+ * called.
+ *
+ * @param request       Specifies the matchmaking requirements.
+ * @param createMatchCB Function called when match creation has completed.
+ * @param callbacks     Structure difining a set of callbacks to be called for
+ *                      events once the match has started.
+ * @return
+ * - @ref S3E_RESULT_SUCCESS if no error occurred.
+ * - @ref S3E_RESULT_ERROR if the operation failed.
+ *   Call s3eIOSGameCenterGetError() to retrieve an error code.
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+s3eResult s3eIOSGameCenterMatchmakerCreateMatch(s3eIOSGameCenterMatchRequest* request, s3eIOSGameCenterCreateMatchCallbackFn createMatchCB, s3eIOSGameCenterMatchCallbacks* callbacks) S3E_RESULT_ERROR runonmainthread
+
+/**
+ * Request to add players to the match that the local player is currently in.
+ *
+ * The @e request is used to specify criteria that other players must meet to
+ * be able to join the match. The local user must already be in a match for
+ * this function to succeed.
+ *
+ * @param request       Specifies the matchmaking requirements.
+ * @param addPlayersCB  Function called when players have been found to join the
+ *                      match.
+ * @return
+ * - @ref S3E_RESULT_SUCCESS if no error occurred.
+ * - @ref S3E_RESULT_ERROR if the operation failed.
+ *   Call s3eIOSGameCenterGetError() to retrieve an error code.
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+s3eResult s3eIOSGameCenterMatchmakerAddPlayersToMatch(s3eIOSGameCenterMatchRequest* request, s3eIOSGameCenterAddPlayersToMatchCallbackFn addPlayersCB, void* userData) S3E_RESULT_ERROR runonmainthread
+
+/**
+ * Cancel all on-going matchmaking requests. This will cause any registered
+ * matchmaking callbacks to no longer be called.
+ *
+ * @see s3eIOSGameCenterMatchmakerGUI
+ * @see s3eIOSGameCenterInviteAcceptGUI
+ * @see s3eIOSGameCenterMatchmakerCreateMatch
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+void s3eIOSGameCenterCancelMatchmaking() runonmainthread
+
+/**
+ * Terminates the local player's involvement in a current match.
+ *
+ * This should be called when the local player wishes to leave a match or
+ * an attempt to connect to the match has failed. It will inform all other
+ * players in the match that the local player has disconnected.
+ *
+ * @see s3eIOSGameCenterMatchmakerGUI
+ * @see s3eIOSGameCenterInviteAcceptGUI
+ * @see s3eIOSGameCenterMatchmakerCreateMatch
+ * @return
+ * - @ref S3E_RESULT_SUCCESS if no error occurred.
+ * - @ref S3E_RESULT_ERROR if the operation failed.
+ *   Call s3eIOSGameCenterGetError() to retrieve an error code.
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+s3eResult s3eIOSGameCenterMatchDisconnect() S3E_RESULT_ERROR runonmainthread
+
+/**
+ * Retrieves an integer property for a match.
+ *
+ * @param property  Property to get.
+ * @see s3eIOSGameCenterMatchProperty
+ * @return
+ * - -1 if an error occurred.
+ *   Call s3eIOSGameCenterGetError() to retrieve an error code.
+ *   This will return:
+ *    - @ref S3E_IOSGAMECENTER_ERR_PARAM if the property is invalid
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+int32 s3eIOSGameCenterMatchGetInt(s3eIOSGameCenterMatchProperty property) -1
+
+/**
+ * Retrieves a string property for a player.
+ *
+ * @param player   Player to query.
+ * @param property Property to get.
+ * @return
+ *  - A NULL-terminated property string of length >= 1 if the operation
+ *    succeeded.
+ *  - The empty string ("") if the operation failed.
+ *    Call s3eIOSGameCenterGetError() to retrieve an error code. This will return:
+ *    @ref S3E_IOSGAMECENTER_ERR_PARAM if @e property is invalid.
+ * @see s3eIOSGameCenterPlayerProperty
+ * @see s3eIOSGameCenterPlayerGetInt
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+const char* s3eIOSGameCenterPlayerGetString(s3eIOSGameCenterPlayer* player, s3eIOSGameCenterPlayerProperty property) ""
+
+/**
+ * Retrieves an integer property for the player.
+ *
+ * @param player   Player to query.
+ * @param property Property to get.
+ * @return
+ * - -1 if an error occurred.
+ *   Call s3eIOSGameCenterGetError() to retrieve an error code.
+ *   This will return:
+ *    - @ref S3E_IOSGAMECENTER_ERR_PARAM if @e property is invalid.
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+int32 s3eIOSGameCenterPlayerGetInt(s3eIOSGameCenterPlayer* player, s3eIOSGameCenterPlayerProperty property) -1
+
+/**
+ * Get a list of the IDs of all players connected in the match.
+ *
+ * @param char** playerIDs  Array of strings to populate with the IDs of
+ *                          players in the match.
+ * @param maxPlayerIDs      Max number of player ID strings to find (i.e. size
+ *                          of the playerIDs array.
+ * @see s3eIOSGameCenterPlayer
+ * @return
+ * - The number of players in the match.
+ * - -1 if an error occurred.
+ *   Call s3eIOSGameCenterGetError() to retrieve an error code.
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+int32 s3eIOSGameCenterGetPlayerIDsInMatch(char** playerIDs, int maxPlayerIDs) -1
+
+/**
+ * Request a list of players from a list of player ID strings.
+ *
+ * This can be called for any list of playerIDs including those not in
+ * any connected match. The callback will receive an error if any player
+ * IDs are invalid.
+ *
+ * @see s3eIOSGameCenterPlayer
+ * @return
+ * - @ref S3E_RESULT_SUCCESS if no error occurred.
+ * - @ref S3E_RESULT_ERROR if the operation failed.
+ *   Call s3eIOSGameCenterGetError() to retrieve an error code.
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+s3eResult s3eIOSGameCenterGetPlayers(const char** playerIDs, int numPlayers, s3eIOSGameCenterGetPlayersCallbackFn callback) S3E_RESULT_ERROR runonmainthread
+
+/**
+ * Release players from internal memory.
+ *
+ * Each s3eIOSGameCenterPlayer must have been returned from a some call to
+ * s3eIOSGameCenterGetPlayersCallbackFn to be valid. @e players is a C array of
+ * s3eIOSGameCenterPlayer*s that should have been allocated by the application.
+ * Once released, pointers will not be set NULL and the application
+ * is responsible for freeing the pointer array itself.
+ *
+ * This function will ignore NULL player pointers but does not handle errors due to
+ * invalid pointers being passed.
+ *
+ * @see s3eIOSGameCenterPlayer
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+void s3eIOSGameCenterReleasePlayers(s3eIOSGameCenterPlayer** players, int numPlayers)
+
+/**
+ * Send data to a list of players.
+ *
+ * If a player is no longer valid (has disconnected), they will be ignored.
+ *
+ * @param players    Array of players, by ID, to send the data to.
+ * @param numPlayers The number of players in the @e players array
+ * @param data       Pointer to the data to be sent.
+ * @param dataLen    The size of data to be sent (in bytes).
+ * @param mode       Whether the data should be sent reliably or unreliably.
+ * @return
+ * - @ref S3E_RESULT_SUCCESS if no error occurred.
+ * - @ref S3E_RESULT_ERROR if the operation failed.
+ *   Call s3eIOSGameCenterGetError() to retrieve an error code.
+ * @see s3eIOSGameCenterSendDataToAllPlayers
+ * @see s3eIOSGameCenterMatchSendDataMode
+ * @see s3eIOSGameCenterReceiveDataCallbackFn
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+s3eResult s3eIOSGameCenterSendDataToPlayers(char** playerIDs, int numPlayers, const void* data, int dataLen, s3eIOSGameCenterMatchSendDataMode mode) S3E_RESULT_ERROR
+
+/**
+ * Send data to all players.
+ *
+ * @param data     Pointer to the data to be sent.
+ * @param dataLen  The size of data to be sent.
+ * @param mode     Whether the data should be sent reliably or unreliably.
+ * @return
+ * - @ref S3E_RESULT_SUCCESS if no error occurred.
+ * - @ref S3E_RESULT_ERROR if the operation failed.
+ *   Call s3eIOSGameCenterGetError() to retrieve an error code.
+ * @see s3eIOSGameCenterSendDataToPlayers
+ * @see s3eIOSGameCenterMatchSendDataMode
+ * @see s3eIOSGameCenterReceiveDataCallbackFn
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+s3eResult s3eIOSGameCenterSendDataToAllPlayers(const void* data, int dataLen, s3eIOSGameCenterMatchSendDataMode mode) S3E_RESULT_ERROR
+
+
+/**
+ * Asynchronously load a list of leaderboards categories available for the app.
+ *
+ * @see s3eIOSGameCenterLeaderboardLoadCategoriesCallbackFn
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+s3eResult s3eIOSGameCenterLeaderboardLoadCategories(s3eIOSGameCenterLeaderboardLoadCategoriesCallbackFn loadCategoriesCB) S3E_RESULT_ERROR runonmainthread
+
+/**
+ * Display a leaderboard for a given category and time scope using the
+ * native iOS Game Center GUI.
+ *
+ * @remark Use s3eIOSGameCenterLeaderboardLoadCategories to find a valid list of
+ *         categories that this function can be called for.
+ * @param category  Name of the category to limit results to.
+ * @param timeScope Time scope to limit results to.
+ * @return
+ * - @ref S3E_RESULT_SUCCESS if no error occurred.
+ * - @ref S3E_RESULT_ERROR if the operation failed.
+ *   Call s3eIOSGameCenterGetError() to retrieve an error code.
+ * @see s3eIOSGameCenterLeaderboardLoadCategories
+ * @see s3eIOSGameCenterTimeScope
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+s3eResult s3eIOSGameCenterLeaderboardShowGUI(const char* category, s3eIOSGameCenterTimeScope timeScope) S3E_RESULT_ERROR
+
+/**
+ * Create a leaderboard to then use to request score information.
+ * Optionally specify a list of player IDs to limit the leaderboard to.
+ * Specifying player IDs will cause any values subsequently set for
+ * S3E_IOSGAMECENTER_LEADERBOARD_PLAYER_SCOPE to be ignored.
+ * Leaderboards must be freed by calling s3eIOSGameCenterLeaderboardRelease().
+ *
+ * @see s3eIOSGameCenterLeaderboard
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+s3eIOSGameCenterLeaderboard* s3eIOSGameCenterCreateLeaderboard(const char** playerIDs, int numPlayers) NULL
+
+/**
+ * Get a leaderboard property value.
+ *
+ * @see s3eIOSGameCenterLeaderboardProperty
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+int32 s3eIOSGameCenterLeaderboardGetInt(s3eIOSGameCenterLeaderboard* leaderboard, s3eIOSGameCenterLeaderboardProperty property) -1
+
+/**
+ * Set a leaderboard value to specify which scores to retrieve.
+ *
+ * @see s3eIOSGameCenterLeaderboardProperty
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+s3eResult s3eIOSGameCenterLeaderboardSetInt(s3eIOSGameCenterLeaderboard* leaderboard, s3eIOSGameCenterLeaderboardProperty property, int32 value) S3E_RESULT_ERROR
+
+/**
+ * Get a leaderboard string value
+ */
+const char* s3eIOSGameCenterLeaderboardGetString(s3eIOSGameCenterLeaderboard* leaderboard, s3eIOSGameCenterLeaderboardProperty property) ""
+
+/**
+ * Set a leaderboard string value
+ */
+s3eResult s3eIOSGameCenterLeaderboardSetString(s3eIOSGameCenterLeaderboard* leaderboard, s3eIOSGameCenterLeaderboardProperty property, const char* value) S3E_RESULT_ERROR
+
+/**
+ * Asynchronously Request scores that match the requirements of a given
+ * leaderboard.
+ */
+s3eResult s3eIOSGameCenterLeaderboardLoadScores(s3eIOSGameCenterLeaderboard* leaderboard, s3eIOSGameCenterLoadScoresCallbackFn loadScoresCB) S3E_RESULT_ERROR
+
+/**
+ * Release a leaderboard. Should be called for every board created
+ * with s3eIOSGameCenterCreateLeaderboard when finished with.
+ */
+s3eResult s3eIOSGameCenterLeaderboardRelease(s3eIOSGameCenterLeaderboard* leaderboard) S3E_RESULT_ERROR
+
+/**
+ * Report/submit a score to the Game Center servers.
+ * scoreReport indicates whether the asynchronous submission is successful.
+ */
+s3eResult s3eIOSGameCenterReportScore(int64 score, const char* category, s3eIOSGameCenterOperationCompleteCallbackFn callback) S3E_RESULT_ERROR
+
+
+/**
+ * Load a list of all possible achievements for the current application.
+ * 
+ * The structure returned to the callback function contains a list of 
+ * s3eIOSGameCenterAchievementInfo structs, eaach of which describes an available
+ * achievement in detail, but does not provide player-related information.
+ * @param callback Function to return a list of achievment info structures to.
+ * @return
+ * - @ref S3E_RESULT_SUCCESS if no error occurred.
+ * - @ref S3E_RESULT_ERROR if the operation failed.
+ *   Call s3eIOSGameCenterGetError() to retrieve an error code.
+ * @see s3eIOSGameCenterLoadAchievementInfoCallbackFn
+ * @see s3eIOSGameCenterAchievementInfoList
+ * @see s3eIOSGameCenterAchievementInfo
+ * @see s3eIOSGameCenterLoadAchievements
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+s3eResult s3eIOSGameCenterLoadAchievementInfo(s3eIOSGameCenterLoadAchievementInfoCallbackFn callback) S3E_RESULT_ERROR
+
+/**
+ * Load achievements for the local player.
+ * 
+ * The structure returned to the callback function contains a list of 
+ * s3eIOSGameCenterAchievement structs which list the achievemnts by UID only,
+ * along with and the player's current score for each as a percentage.
+ * @return
+ * - @ref S3E_RESULT_SUCCESS if no error occurred.
+ * - @ref S3E_RESULT_ERROR if the operation failed.
+ *   Call s3eIOSGameCenterGetError() to retrieve an error code.
+ * @see s3eIOSGameCenterLoadAchievementsCallbackFn
+ * @see s3eIOSGameCenterAchievementList
+ * @see s3eIOSGameCenterAchievement
+ * @see s3eIOSGameCenterLoadAchievementInfo
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+s3eResult s3eIOSGameCenterLoadAchievements(s3eIOSGameCenterLoadAchievementsCallbackFn callback) S3E_RESULT_ERROR
+
+/**
+ * Reset all achievements for the current user.
+ */
+s3eResult s3eIOSGameCenterAchievementsReset() S3E_RESULT_ERROR
+
+/**
+ * Report the percentage complete of a given achievement.
+ */
+s3eResult s3eIOSGameCenterReportAchievement(const char* name, int percentComplete, s3eIOSGameCenterOperationCompleteCallbackFn callback) S3E_RESULT_ERROR
+
+
+/**
+ * Checks if voice chat is available.
+ *
+ * This will return false if the device does not support Voice Chat/VoIP for
+ * any reason.
+ *
+ * @return
+ * - S3E_TRUE if voice chat is allowed
+ * - S3E_FALSE if voice chat not allowed
+ * @see s3eIOSGameCenterVoiceChatCloseChannel
+ * @see s3eIOSGameCenterVoiceChatOpenChannel
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+s3eBool s3eGameCentreVoiceChatIsAllowed() S3E_FALSE runonmainthread
+
+/**
+ * Set a callback function to be called whenever a players voice chat state
+ * (connected/disconnected/etc) changes.
+ *
+ * @return
+ * - S3E_RESULT_SUCCESS if no error occurred
+ * - S3E_RESULT_ERROR if the operation failed.
+ * @see s3eIOSGameCenterVoiceChatUpdateCallbackFn
+ * @see s3eIOSGameCenterVoiceChatState
+ * @see s3eIOSGameCenterVoiceChatPlayerState
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+s3eResult s3eIOSGameCenterSetVoiceChatUpdateHandler(s3eIOSGameCenterVoiceChatUpdateCallbackFn voiceChatUpdateCB) S3E_RESULT_ERROR
+
+/**
+ * Joins a voice chat channel and creates it if necessary.
+ *
+ * The player must be in a match to join a voice chat channel and the channel
+ * is local to the current match. Therefore, different matches may have
+ * voice channels with the same name but only players in the same match will be
+ * connected to each-other.
+ *
+ * All participants who join a channel with the same name can speak to each
+ * other using the device's microphone and speaker. A match can support
+ * multiple channels and a player can join more than one channel at a time.
+ * When the local player disconnects from the match using
+ * s3eIOSGameCenterMatchDisconnect, any open voice channels will be closed and
+ * s3eIOSGameCenterVoiceChat pointer will become invalid. Parental controls can
+ * prevent a player from joining voice chat.
+ *
+ * @param channelName Name of the channel to connect via. Will be created if it
+ *                    does not exist.
+ * @return
+ * - A s3eIOSGameCenterVoiceChat pointer is successful.
+ * - NULL if the operation failed.
+ *   Call s3eIOSGameCenterGetError() to retrieve an error code.
+ * @see s3eIOSGameCenterVoiceChat
+ * @see s3eGameCentreVoiceChatIsAllowed
+ * @see s3eIOSGameCenterVoiceChatCloseChannel
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+s3eIOSGameCenterVoiceChat* s3eIOSGameCenterVoiceChatOpenChannel(const char* channelName) NULL runonmainthread
+
+/**
+ * Closes a voice chat channel.
+ *
+ * The player will be disconnected and any internal memory used by the channel
+ * is released. Open channels should be explicitly closed before disconnecting
+ * from match or when the local player is disconnected due to an error.
+ *
+ * @param channel Pointer to the channel to close.
+ * @return
+ * - @ref S3E_RESULT_SUCCESS if no error occurred.
+ * - @ref S3E_RESULT_ERROR if the operation failed.
+ *   Call s3eIOSGameCenterGetError() to retrieve an error code.
+ * @see s3eIOSGameCenterVoiceChat
+ * @see s3eIOSGameCenterVoiceChatOpenChannel
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+s3eResult s3eIOSGameCenterVoiceChatCloseChannel(s3eIOSGameCenterVoiceChat* channel) S3E_RESULT_ERROR runonmainthread
+
+/**
+ * Get a voice chat property.
+ *
+ * @param channel  Pointer to the channel to inspect.
+ * @param property Property to return.
+ * @return
+ * - -1 if an error occurred.
+ *   Call s3eIOSGameCenterGetError() to retrieve an error code.
+ *   This will return:
+ *    - @ref S3E_IOSGAMECENTER_ERR_PARAM if the property is invalid
+ * @see s3eIOSGameCenterVoiceChat
+ * @see s3eIOSGameCenterVoiceChatProperty
+ * @see s3eIOSGameCenterVoiceChatSetInt
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+int32 s3eIOSGameCenterVoiceChatGetInt(s3eIOSGameCenterVoiceChat* channel, s3eIOSGameCenterVoiceChatProperty property) -1 runonmainthread
+
+/**
+ * Set a voice chat property.
+ *
+ * @param channel  Pointer to the channel.
+ * @param property Property to set.
+ * @return
+ * - @ref S3E_RESULT_SUCCESS if no error occurred.
+ * - @ref S3E_RESULT_ERROR if the operation failed.
+ *   Call s3eIOSGameCenterGetError() to retrieve an error code.
+ * @see s3eIOSGameCenterVoiceChat
+ * @see s3eIOSGameCenterVoiceChatProperty
+ * @see s3eIOSGameCenterVoiceChatGetInt
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+s3eResult s3eIOSGameCenterVoiceChatSetInt(s3eIOSGameCenterVoiceChat* channel, s3eIOSGameCenterVoiceChatProperty property, int32 value) S3E_RESULT_ERROR runonmainthread
+
+/**
+ * Mute or un-mute the audio coming from a specific player on a given channel.
+ *
+ * @param channel  Pointer to the channel.
+ * @param playerID ID of the player to be (un)muted.
+ * @param mute     Whether the player's audio should be muted or not.
+ * @return
+ * - @ref S3E_RESULT_SUCCESS if no error occurred.
+ * - @ref S3E_RESULT_ERROR if the operation failed.
+ *   Call s3eIOSGameCenterGetError() to retrieve an error code.
+ * @see s3eIOSGameCenterVoiceChat
+ * @par Required Header Files
+ * s3eIOSGameCenter.h
+ */
+s3eResult s3eIOSGameCenterVoiceChatSetMute(s3eIOSGameCenterVoiceChat* channel, const char* playerID, s3eBool mute) S3E_RESULT_ERROR runonmainthread
+
+
+append:
+/**@}*/
+/**@}*/
