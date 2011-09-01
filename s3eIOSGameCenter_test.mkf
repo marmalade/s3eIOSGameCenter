@@ -1,0 +1,12 @@
+
+# Project file for including files in canary test
+display_name "Extensions/s3eIOSGameCenter"
+
+files
+{
+    ("test")
+    test_s3eIOSGameCenter.cpp
+    test_s3eIOSGameCenter.h
+}
+
+subproject s3eIOSGameCenter
