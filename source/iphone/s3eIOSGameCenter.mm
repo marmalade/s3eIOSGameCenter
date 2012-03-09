@@ -25,6 +25,37 @@
 #include "s3eEdkError.h"
 #define S3E_DEVICE_IOSGAMECENTER S3E_EXT_IOSGAMECENTER_HASH
 
+
+@interface s3eReAuthenticationHandler : NSObject
+- (void)authenticationChanged:(NSNotification *)notif;
+@end
+
+@implementation s3eReAuthenticationHandler
+- (void)authenticationChanged:(NSNotification *)notif
+{
+    IwTrace(GAMECENTER, ("authenticationChanged"));
+    if (![GKLocalPlayer localPlayer].authenticated)
+    {
+        IwTrace(GAMECENTER,("local player no longer signed in"));
+        
+        // Note user authentication callback will be triggered if reuse flag was set on initial call to s3eIOSGameCenterAuthenticate
+        
+        // the login prompt should automatically be shown so lock the statusbar (workaround for keyboard rotation issue: 15991 on IOS5)
+        // is this dangerous?  is there a case where we are signed out and the ui doesn't come up automatically?        
+        if (s3eEdkIPhoneGetVerMaj() > 4)
+            s3eEdkLockOSRotation(S3E_TRUE); // lock the display
+    }
+}
+-(void) dealloc 
+{
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+    [super dealloc];
+}
+@end
+
+static s3eReAuthenticationHandler* g_Authentication; 
+static s3eBool g_ReUseAuthenticationCB;
+
 @interface s3eIOSGameKitMatchDelegate : NSObject <GKMatchDelegate>
 {
     @public NSError*            m_Error;     // Last error (for trace/error codes and to keep functions that need error pointers happy)
@@ -70,7 +101,7 @@ struct s3eIOSGameCenterVoiceChat
     if (fixOrientation == 1 && (interfaceOrientation == UIInterfaceOrientationLandscapeLeft
                                 || interfaceOrientation == UIInterfaceOrientationLandscapeRight))
         return S3E_FALSE;
-        
+
     return YES;
 }
 @end
@@ -629,6 +660,13 @@ static void (^AuthenticateCompletionHandler)(NSError*) = ^(NSError* error)
 {
     IwTrace(GAMECENTER, ("AuthenticateCompletionHandler"));
 
+    // >=4.2 "Each time your application is moved from the background to the foreground, Game Kit automatically 
+    // authenticates the local player again on your behalf and calls your completion handler to provide 
+    // updated information about the state of the authenticated player."
+    
+    s3eEdkLockOSRotation(S3E_FALSE);    // unlock the statusbar
+    s3eEdkUpdateStatusBarOrient();        // reorient statusbar to correct orientation - shouldn't be necessary but just in case
+    
     if (!s3eEdkCallbacksIsRegistered(S3E_EXT_IOSGAMECENTER_HASH, S3E_IOSGAMECENTER_CALLBACK_AUTHENTICATION))
         return;
 
@@ -636,15 +674,15 @@ static void (^AuthenticateCompletionHandler)(NSError*) = ^(NSError* error)
 
     if (error)
         s3eError = ObjcToS3EError(error, true, "Authenticate completion handler");
-    else
+    else    
         IwTrace(GAMECENTER,("Authenticate success, enqueuing callback"));
-
+        
     s3eEdkCallbacksEnqueue(S3E_EXT_IOSGAMECENTER_HASH,
                            S3E_IOSGAMECENTER_CALLBACK_AUTHENTICATION,
                            &s3eError,
                            sizeof(s3eError),
                            NULL,
-                           S3E_TRUE,
+                           !g_ReUseAuthenticationCB, //S3E_TRUE 
                            NULL,
                            NULL);
 };
@@ -935,7 +973,9 @@ static void (^s3eLoadScoresCompletionHandler)(NSArray*, NSError*) = ^(NSArray *s
 
 s3eResult s3eIOSGameCenterInit()
 {
-    if (s3eEdkIPhoneGetVerMaj() == 4 && s3eEdkIPhoneGetVerMin() >= 1)
+    g_Authentication = 0;
+        
+    if (s3eEdkIPhoneGetVerMaj() > 4 || (s3eEdkIPhoneGetVerMaj() == 4 && s3eEdkIPhoneGetVerMin() >= 1))
     {
         // Want to fail if running on 3G or 2nd gen Touch since those are not
         // supported, but no documented way to check (GKMatchmaker responds
@@ -948,13 +988,15 @@ s3eResult s3eIOSGameCenterInit()
         if (strcmp(deviceID, "iPod2,1") && strcmp(deviceID, "iPhone1,2"))
             return S3E_RESULT_SUCCESS;
     }
-
+    
     S3E_EXT_ERROR_SIMPLE(UNSUPPORTED);
     return S3E_RESULT_ERROR;
 }
 
 void s3eIOSGameCenterTerminate()
 {
+    if (g_Authentication)
+        [g_Authentication release];
 }
 
 // Check for callbacks that can only be registered one at a time. null function unregisters if possible
@@ -1006,22 +1048,42 @@ static bool s3eLocalPlayerIsAuthenticated(bool raiseError=true)
     return false;
 }
 
-// Authenticate the player for access to player details and game statistics. This may present login UI to the user if necessary to login or create an account. The user must be autheticated in order to use other APIs. This should be called for each launch of the application as soon as the UI is ready.
-s3eResult s3eIOSGameCenterAuthenticate(s3eIOSGameCenterAuthenticationCallbackFn authenticationCB, void* userData)
+// Authenticate the player for access to player details and game statistics. 
+// This may present login UI to the user if necessary to login or create an account. 
+// The user must be autheticated in order to use other APIs. 
+// This should be called for each launch of the application as soon as the UI is ready.
+s3eResult s3eIOSGameCenterAuthenticate(s3eIOSGameCenterAuthenticationCallbackFn authenticationCB, void* userData, s3eBool reuse)
 {
     IwTrace(GAMECENTER, ("s3eIOSGameCenterAuthenticate"));
+
     GAMECENTER_CALLBACK_CHECK(authenticationCB, AUTHENTICATION);
 
+    g_ReUseAuthenticationCB = reuse;
+    
     // One at a time callback to indicate check completion. Will be notified
-    // with oneShot=true so that it unregisters itself for the next call
+    // with oneShot=true so that it unregisters itself for the next call (if reuse==0)
     EDK_CALLBACK_REG(IOSGAMECENTER, AUTHENTICATION, (s3eCallback)authenticationCB, userData, true);
 
-    // TODO: we may want to register the callback to also be triggered by the
-    // GKPlayerAuthenticationDidChangeNotificationName Notification which uses
-    // the global notifications system:
-    // developer.apple.com/iphone/library/documentation/General/Conceptual/DevPedia-CocoaCore/Notification.html
-    // Would need a StopNotifications type function in that case.
+    // TODO: GKPlayerAuthenticationDidChangeNotificationName implemented but needs looking into
+    // to handle the special case of user sign off then on when in background
+    // to handle the special case of user signing to another account when in background
+    // we may want the userdata to reflect these cases
+    
+    // adding dummyview seems to have no effect on login modal on ios5 so commenting it out:
+    // g_DummyController = [[DummyController alloc] init];
+    // UIView* dummyView = [[UIView alloc] initWithFrame:[UIScreen mainScreen].applicationFrame];
+    // g_DummyController.view = dummyView;    
+    // [s3eEdkGetUIView() addSubview:g_DummyController.view];
+    // [dummyView setBackgroundColor:[UIColor colorWithWhite:1.0 alpha:0.5]];
+        
+    g_Authentication = [[s3eReAuthenticationHandler alloc] init];
+    [[NSNotificationCenter defaultCenter] addObserver:g_Authentication selector:@selector(authenticationChanged:) name:GKPlayerAuthenticationDidChangeNotificationName object:nil];
+        
+    if (s3eEdkIPhoneGetVerMaj() > 4)
+        s3eEdkLockOSRotation(S3E_TRUE); 
+        
     [[GKLocalPlayer localPlayer] authenticateWithCompletionHandler:AuthenticateCompletionHandler];
+    
     return S3E_RESULT_SUCCESS;
 }
 
@@ -1260,7 +1322,7 @@ s3eBool s3eIOSGameCenterInviteAcceptGUI(void* inviteID, s3eIOSGameCenterMatchCal
     while (g_InGUI)
     {
         usleep(10000);
-        //IwTrace(GAMECENTER, ("waiting for GUI ..."));
+        IwTrace(GAMECENTER, ("waiting for GUI ..."));
     }
 
     //[(GKInvite*)inviteID release];
@@ -1433,7 +1495,7 @@ s3eResult s3eIOSGameCenterMatchmakerGUI_Generic(s3eIOSGameCenterMatchRequest* re
     while (g_InGUI)
     {
         usleep(10000);
-        //IwTrace(GAMECENTER, ("waiting for GUI ..."));
+        IwTrace(GAMECENTER, ("waiting for GUI ..."));
     }
 
     if (g_GUIResult == S3E_RESULT_ERROR && s3eEdkCallbacksIsRegistered(S3E_EXT_IOSGAMECENTER_HASH, S3E_IOSGAMECENTER_CALLBACK_FIND_PLAYERS))
