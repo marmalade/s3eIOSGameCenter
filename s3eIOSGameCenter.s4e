@@ -1118,7 +1118,7 @@ typedef enum s3eIOSGameCenterVoiceChatState
 typedef struct s3eIOSGameCenterVoiceChatPlayerState
 {
     /** ID of player whose state has changed */
-    char                            m_PlayerID[S3E_IOSGAMECENTER_STRING_MAX];
+    char m_PlayerID[S3E_IOSGAMECENTER_STRING_MAX];
 
     /** New state of the given player */
     s3eIOSGameCenterVoiceChatState     m_State;
@@ -1175,12 +1175,18 @@ const char* s3eIOSGameCenterGetString(s3eIOSGameCenterProperty property) ""
 /**
  * Authenticate the local player.
  *
+ * @param authenticationCB  Callback function to be called after Game Center 
+ *                          tries to authenticate local player
+ * @param userData          Currently unused - set it to NULL
+ * @param reuse             Flag to indicate callback can be reused for 
+ *                          mid-game authentications of local player
+ *
  * This must be called and the player must be authenticated in order to
  * use any other game center functions.
  * @par Required Header Files
  * s3eIOSGameCenter.h
  */
-s3eResult s3eIOSGameCenterAuthenticate(s3eIOSGameCenterAuthenticationCallbackFn authenticationCB, void* userData) S3E_RESULT_ERROR run_on_os_thread
+s3eResult s3eIOSGameCenterAuthenticate(s3eIOSGameCenterAuthenticationCallbackFn authenticationCB, void* userData, s3eBool reuse S3E_DEFAULT(0)) S3E_RESULT_ERROR run_on_os_thread
 
 /**
  * Load a list of friends for the local player asynchronously.
@@ -1253,7 +1259,7 @@ s3eResult s3eIOSGameCenterMatchmakerFindPlayersForHostedRequest(s3eIOSGameCenter
  * and the user selects players to create the match with.
  *
  * @param request       Specifies the initial matchmaking requirements.
- * @param callbacks     Structure difining a set of callbacks to be called for
+ * @param callbacks     Structure defining a set of callbacks to be called for
  *                      events once the match has started.
  * @ return
  * - @ref S3E_RESULT_SUCCESS if a match is successfully started.
@@ -1310,7 +1316,7 @@ s3eResult s3eIOSGameCenterMatchmakerHostedGUI(s3eIOSGameCenterMatchRequest* requ
  *
  * @param request       Specifies the matchmaking requirements.
  * @param createMatchCB Function called when match creation has completed.
- * @param callbacks     Structure difining a set of callbacks to be called for
+ * @param callbacks     Structure defining a set of callbacks to be called for
  *                      events once the match has started.
  * @return
  * - @ref S3E_TRUE   if the GUI is displayed, the user accepts the invitation.
@@ -1348,7 +1354,7 @@ s3eResult s3eIOSGameCenterReleaseInvite(void* inviteID) S3E_RESULT_ERROR run_on_
  *
  * @param request       Specifies the matchmaking requirements.
  * @param createMatchCB Function called when match creation has completed.
- * @param callbacks     Structure difining a set of callbacks to be called for
+ * @param callbacks     Structure defining a set of callbacks to be called for
  *                      events once the match has started.
  * @return
  * - @ref S3E_RESULT_SUCCESS if no error occurred.
